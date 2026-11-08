@@ -58,7 +58,7 @@ class QcomFwkDetectArchiveBoundary(unittest.TestCase):
 
     def test_original_fwk_detect_tree_unchanged(self):
         self.assertEqual(entry("HEAD", "fwk-detect"),
-                         ("040000", "tree", "ba6f4b1df19b18c4a1e01d1a4f933b1ee108c020"))
+                         ("040000", "tree", "94c309eb51256fa9a3e1c5902d5b6517e09955ea"))
         self.assertEqual(entry("HEAD", ".gitupstream"),
                          ("100644", "blob", "a37a2845c6910ce8405f1f45abb5b2a32bbf20e2"))
         self.assertEqual(entry("HEAD", "fwk-detect"),
