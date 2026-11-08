@@ -1,0 +1,66 @@
+name: AOSP17 Qualcomm core-utils-sys fwk-detect source and host behavior gate
+
+on:
+  push:
+    branches:
+      - audit/a17-qcom-core-utils-sys-fwk-detect-boundary-20261108
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-optional-qcom-framework-detector:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout original Qualcomm detector source without device dependencies
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout: |
+            fwk-detect
+            docs
+            tests
+            .github
+
+      - name: Pin independent AOSP17 manifest and check all 135 entries
+        run: |
+          set -euo pipefail
+          git init -q "$RUNNER_TEMP/a17-manifest"
+          git -C "$RUNNER_TEMP/a17-manifest" remote add origin \
+            https://github.com/PixelExperience-Reborn/manifest.git
+          git -C "$RUNNER_TEMP/a17-manifest" fetch -q --depth 1 origin \
+            a5a6ca90f167da4ffc037e8cb09995e286d5597f
+          git -C "$RUNNER_TEMP/a17-manifest" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/a17-manifest" rev-parse HEAD)" = \
+            "a5a6ca90f167da4ffc037e8cb09995e286d5597f"
+          python3 "$RUNNER_TEMP/a17-manifest/tools/validate_aosp17_base_profiles.py"
+          python3 -m unittest discover -s "$RUNNER_TEMP/a17-manifest/tools" \
+            -p test_aosp17_manifest_entrypoint.py -v
+          python3 "$RUNNER_TEMP/a17-manifest/tools/validate_135_repository_matrix.py"
+
+      - name: Check untouched Git ancestry and Qualcomm C/JNI/Java source ownership
+        run: |
+          set -euo pipefail
+          PE_AOSP17_REFERENCE="$RUNNER_TEMP/a17-manifest/aosp17_reference.xml" \
+          PE_AOSP17_DEFAULT="$RUNNER_TEMP/a17-manifest/default.xml" \
+            python3 tests/test_aosp17_core_utils_sys_boundary.py
+
+      - name: Host Clang compile original Qualcomm C detector with mock sysprops
+        run: |
+          set -euo pipefail
+          clang --version | head -n 1
+          clang -std=c11 -Wall -Wextra -Werror \
+            -I tests/host_stubs -I fwk-detect \
+            fwk-detect/vndfwk-detect.c tests/test_vndfwk_detect_host.c \
+            -o "$RUNNER_TEMP/test_vndfwk_detect_host"
+          "$RUNNER_TEMP/test_vndfwk_detect_host"
+
+      - name: Test scope and hardware ownership
+        run: |
+          echo "Host truth-table test checks original C logic with mock properties."
+          echo "No Qualcomm JNI/Android service or AOSP17 Soong product built."
+          echo "No LineageOS/LF52406 device tree, firmware, or extra ROM features imported."
